@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Terminal</title>
+    
+    <!-- Bootstrap CSS from CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- xterm.js CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" rel="stylesheet">
+    
+    <style>
+        .terminal-container {
+            padding: 20px;
+            background-color: #1e1e1e;
+            border-radius: 8px;
+            margin: 20px auto;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        #terminal {
+            height: 500px;
+            width: 100%;
+        }
+        .navbar-brand {
+            font-weight: bold;
+        }
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .status-connected {
+            background-color: #28a745;
+        }
+        .status-disconnected {
+            background-color: #dc3545;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- Navigation bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">Web Terminal</a>
+            <div class="navbar-text text-light">
+                <span id="connection-status">
+                    <span class="status-indicator status-disconnected"></span>
+                    Disconnected
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main content -->
+    <div class="container">
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="terminal-container">
+                    <div id="terminal"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- xterm.js -->
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+
+    <script>
+        // Initialize terminal
+        const term = new Terminal({
+            cursorBlink: true,
+            fontSize: 14,
+            fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+            theme: {
+                background: '#1e1e1e',
+                foreground: '#ffffff'
+            },
+            convertEol: true,
+            cursorStyle: 'block',
+            scrollback: 1000,
+            allowTransparency: true
+        });
+
+        // Initialize the fit addon
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+
+        // Create WebSocket connection
+        const sessionId = Date.now().toString();
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}/ws/${sessionId}`);
+        
+        // For debugging
+        console.log(`Connecting to WebSocket at: ${protocol}//${window.location.host}/ws/${sessionId}`);
+        
+        let connectionStatus = document.getElementById('connection-status');
+        let statusIndicator = connectionStatus.querySelector('.status-indicator');
+
+        // Attach terminal to DOM
+        term.open(document.getElementById('terminal'));
+        fitAddon.fit();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            fitAddon.fit();
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'resize',
+                    rows: term.rows,
+                    cols: term.cols
+                }));
+            }
+        });
+
+        // WebSocket event handlers
+        ws.onopen = () => {
+            statusIndicator.classList.remove('status-disconnected');
+            statusIndicator.classList.add('status-connected');
+            connectionStatus.innerHTML = `
+                <span class="status-indicator status-connected"></span>
+                Connected
+            `;
+            term.write('Connected to terminal server\r\n');
+            
+            // Send initial terminal size
+            ws.send(JSON.stringify({
+                type: 'resize',
+                rows: term.rows,
+                cols: term.cols
+            }));
+        };
+
+        ws.onclose = () => {
+            statusIndicator.classList.remove('status-connected');
+            statusIndicator.classList.add('status-disconnected');
+            connectionStatus.innerHTML = `
+                <span class="status-indicator status-disconnected"></span>
+                Disconnected
+            `;
+            term.write('\r\nDisconnected from terminal server');
+        };
+
+        ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            term.write('\r\nError: Failed to connect to terminal server');
+        };
+
+        ws.onmessage = (event) => {
+            term.write(event.data);
+        };
+
+        // Handle terminal input
+        term.onData(data => {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'input',
+                    data: data
+                }));
+            }
+        });
+
+        // Handle terminal resize
+        term.onResize(size => {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'resize',
+                    rows: size.rows,
+                    cols: size.cols
+                }));
+            }
+        });
+    </script>
+</body>
+</html> 

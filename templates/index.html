@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Web Terminal</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ansi_up@5.0.1/ansi_up.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            font-family: monospace;
+        }
+        #terminal {
+            width: 100%;
+            height: 80vh;
+            background-color: #000000;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        #input {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            background-color: #2d2d2d;
+            border: none;
+            color: #ffffff;
+            font-family: monospace;
+            font-size: 14px;
+            border-radius: 5px;
+        }
+        #input:focus {
+            outline: none;
+        }
+        .status {
+            margin-bottom: 10px;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .connected {
+            color: #4CAF50;
+            background-color: rgba(76, 175, 80, 0.1);
+        }
+        .disconnected {
+            color: #f44336;
+            background-color: rgba(244, 67, 54, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div id="status"></div>
+    <div id="terminal"></div>
+    <input type="text" id="input" placeholder="Type your command...">
+
+    <script>
+        const socket = io({
+            transports: ['websocket'],
+            upgrade: false
+        });
+        const terminal = document.getElementById('terminal');
+        const input = document.getElementById('input');
+        const status = document.getElementById('status');
+        const ansiUp = new AnsiUp();
+
+        // Handle connection status
+        socket.on('connect', function() {
+            console.log('Connected to server');
+            status.innerHTML = '<div class="status connected">Connected to server</div>';
+        });
+
+        socket.on('disconnect', function() {
+            console.log('Disconnected from server');
+            status.innerHTML = '<div class="status disconnected">Disconnected from server</div>';
+        });
+
+        // Handle terminal output
+        socket.on('terminal_output', function(data) {
+            const text = data.data;
+            const span = document.createElement('span');
+            span.innerHTML = ansiUp.ansi_to_html(text);
+            terminal.appendChild(span);
+            terminal.scrollTop = terminal.scrollHeight;
+        });
+
+        // Handle input
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const command = input.value + '\n';
+                socket.emit('terminal_input', { data: command });
+                input.value = '';
+            }
+        });
+
+        // Focus input on page load
+        input.focus();
+    </script>
+</body>
+</html> 
