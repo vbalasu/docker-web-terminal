@@ -71,11 +71,11 @@ def handle_connect():
             "PATH": os.environ.get("PATH", ""),
             "HOME": os.environ.get("HOME", ""),
             "USER": os.environ.get("USER", ""),
-            "SHELL": "/bin/zsh"
+            "SHELL": "/bin/bash"
         }
         
         term = ptyprocess.PtyProcess.spawn(
-            ['/bin/zsh', '--no-rcs'],  # Start zsh without loading rc files
+            ['/bin/bash'],  # Start bash without loading rc files
             dimensions=(24, 80),
             env=env
         )
