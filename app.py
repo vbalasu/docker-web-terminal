@@ -75,7 +75,7 @@ def handle_connect():
         }
         
         term = ptyprocess.PtyProcess.spawn(
-            ['/bin/bash'],  # Start bash without loading rc files
+            ['docker', 'run', '-ti', '--rm', '--cpus=0.5', '--memory=100m', 'python:3.12.9-bookworm'],  # Start bash without loading rc files
             dimensions=(24, 80),
             env=env
         )
